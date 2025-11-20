@@ -1,10 +1,8 @@
-// app/layout.tsx
 import "./globals.css";
 import type { Metadata } from "next";
-import React from "react";
 
 export const metadata: Metadata = {
-  title: "Plant Doctor – AI 진단",
+  title: "Plant Doctor",
   description: "AI Disease Diagnosis",
 };
 
@@ -19,4 +17,3 @@ export default function RootLayout({
     </html>
   );
 }
-
