@@ -1,69 +1,104 @@
 "use client";
+
 import { useState } from "react";
 
 export default function AnalysisPage() {
-  const [imageBase64, setImageBase64] = useState("");
-  const [result, setResult] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [result, setResult] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const convertToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-    });
+  // -----------------------------
+  // 🔥 파일 선택
+  // -----------------------------
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+
+    const selected = e.target.files[0];
+    setFile(selected);
+
+    const reader = new FileReader();
+    reader.onload = (ev) => setPreview(ev.target?.result as string);
+    reader.readAsDataURL(selected);
   };
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const base64 = await convertToBase64(file);
-    setImageBase64(base64.replace(/^data:image\/\w+;base64,/, ""));
-  };
-
+  // -----------------------------
+  // 🔥 서버 업로드 + 분석 요청
+  // -----------------------------
   const handleAnalyze = async () => {
-    if (!imageBase64) {
-      setResult("⚠️ 이미지를 먼저 업로드해주세요.");
+    if (!file) {
+      alert("이미지를 선택해주세요.");
       return;
     }
 
-    try {
-      setResult("🔍 AI 분석 중...⏳");
+    setLoading(true);
+    setResult(null);
 
-      const response = await fetch("/api/analyze", {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch("/api/analyze", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ imageBase64 }),
+        body: formData,
       });
 
-      const data = await response.json();
+      const data = await res.json();
 
-      if (response.ok) {
-        setResult(`📌 분석 결과: ${data.result || "결과 없음"}`);
+      if (data.error) {
+        alert(data.error);
       } else {
-        setResult(`❌ 오류 발생: ${data.error || "알 수 없는 오류"}`);
+        setImageUrl(data.imageUrl);
+        setResult(data.analysis);
       }
     } catch (error) {
+      alert("분석 요청 중 오류가 발생했습니다.");
       console.error(error);
-      setResult("❌ 서버 오류 발생");
     }
+
+    setLoading(false);
   };
 
   return (
-    <div style={{ padding: 20 }}>
-      <h2>🌾 작물 병해충 AI 분석</h2>
+    <div className="p-6 max-w-2xl mx-auto space-y-6">
+      <h1 className="text-2xl font-bold">병해충 진단 결과</h1>
 
-      <input type="file" accept="image/*" onChange={handleUpload} />
+      {/* 이미지 선택 */}
+      <input type="file" accept="image/*" onChange={handleFileChange} />
 
-      <button onClick={handleAnalyze} style={{ marginTop: 10 }}>
-        AI 분석 시작
+      {/* 미리보기 */}
+      {preview && (
+        <div className="mt-4">
+          <p className="font-semibold">선택한 이미지 미리보기</p>
+          <img src={preview} className="w-full rounded-lg border" />
+        </div>
+      )}
+
+      {/* 분석 버튼 */}
+      <button
+        onClick={handleAnalyze}
+        disabled={loading}
+        className="bg-green-600 text-white px-4 py-2 rounded-lg mt-4"
+      >
+        {loading ? "분석 중..." : "분석하기"}
       </button>
 
-      <div style={{ marginTop: 20, whiteSpace: "pre-line" }}>
-        {result && <p>{result}</p>}
-      </div>
+      {/* 서버에서 받은 이미지 */}
+      {imageUrl && (
+        <div>
+          <p className="font-semibold mt-4">서버에 저장된 이미지</p>
+          <img src={imageUrl} className="w-full rounded-lg border" />
+        </div>
+      )}
+
+      {/* 분석 결과 */}
+      {result && (
+        <div className="mt-4 p-4 border rounded-lg bg-gray-50 whitespace-pre-wrap leading-relaxed">
+          <h2 className="font-bold mb-2">📌 분석 결과</h2>
+          {result}
+        </div>
+      )}
     </div>
   );
 }
